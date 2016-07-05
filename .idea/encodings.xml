@@ -2,9 +2,7 @@
 <project version="4">
   <component name="Encoding">
     <file url="file://$PROJECT_DIR$" charset="UTF-8" />
-    <file url="file://$PROJECT_DIR$/lib/bcmail-jdk14-138.jar" charset="windows-1252" />
-    <file url="file://$PROJECT_DIR$/lib/bcprov-jdk14-138.jar" charset="windows-1252" />
-    <file url="file://$PROJECT_DIR$/lib/bctsp-jdk14-1.46.jar" charset="windows-1252" />
-    <file url="file://$PROJECT_DIR$/lib/itext-2.1.7.jar" charset="windows-1252" />
+    <file url="file://$PROJECT_DIR$/D200_XML_2015_200116.pdf" charset="windows-1252" />
+    <file url="file://$PROJECT_DIR$/OoPdfFormExample.pdf" charset="windows-1252" />
   </component>
 </project>
