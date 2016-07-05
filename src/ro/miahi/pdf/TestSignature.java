@@ -1,5 +1,6 @@
 package ro.miahi.pdf;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.lowagie.text.ExceptionConverter;
 import com.lowagie.text.pdf.AcroFields;
 import com.lowagie.text.pdf.PdfPKCS7;
@@ -22,7 +23,8 @@ public class TestSignature {
         try {
             TestSignature ts = new TestSignature();
             ts.setFileName("SampleSignedPDFDocument.pdf");
-            ts.verifyPdf();
+            String json = ts.verifyPdf();
+            System.out.println(json);
             ts.setFileName("OoPdfFormExample.pdf");
             ts.fillForm();
         } catch (Exception e) {
@@ -52,7 +54,7 @@ public class TestSignature {
 
     }
 
-    public boolean verifyPdf() throws Exception {
+    public String verifyPdf() throws Exception {
 
         // todo: populate the keystore
         KeyStore kall = PdfPKCS7.loadCacertsKeyStore();
@@ -63,45 +65,55 @@ public class TestSignature {
         // Search of the whole signature
         ArrayList<String> names = af.getSignatureNames();
 
-        for (String name : names) {
-            // Name
-            System.out.println("Signature name: " + name);
-            System.out.println("Signature covers whole document: " + af.signatureCoversWholeDocument(name));
-            // Doc info
-            System.out.println("Document revision: " + af.getRevision(name) + " of " + af.getTotalRevisions());
+        HashMap response = new HashMap();
 
+        for (String name : names) {
+            HashMap signature = new HashMap();
+            response.put(name, signature);
+            // Name
+            signature.put("signature_name", name);
+            signature.put("whole_document", af.signatureCoversWholeDocument(name));
+            // Doc info
+            signature.put("revision", af.getRevision(name));
+            signature.put("total_revisions", af.getTotalRevisions());
             PdfPKCS7 pk = af.verifySignature(name);
             Calendar cal = pk.getSignDate();
             Certificate pkc[] = pk.getCertificates();
 
             // Information about the certificate and signature
-            System.out.println("Subject: " + PdfPKCS7.getSubjectFields(pk.getSigningCertificate()));
-            // Was the doc modified
-            System.out.println("Document modified: " + !pk.verify());
-            System.out.println("Sign date: " + cal.getTime());
-            System.out.println("Reason: " + pk.getReason());
+            signature.put("signature_subject", PdfPKCS7.getSubjectFields(pk.getSigningCertificate()).toString());
+            signature.put("modified", !pk.verify());
+            signature.put("sign_date", cal.getTime());
+            signature.put("sign_reason", pk.getReason());
 
             // Information about timestamps
             if (pk.verifyTimestampImprint()) {
-                System.out.println("TSD " + pk.getTimeStampDate().getTime());
-                System.out.println("TSA " + pk.getTimeStampToken().getTimeStampInfo().getTsa().toString());
-            } else {
-                System.out.println("Timestamp not verified");
+                signature.put("TSD", pk.getTimeStampDate().getTime());
+                signature.put("TSA", pk.getTimeStampToken().getTimeStampInfo().getTsa().toString());
             }
 
             // Can it be verified?
             Object fails[] = PdfPKCS7.verifyCertificates(pkc, kall, null, cal);
-            if (fails == null)
-                System.out.println("Certificates verified against the KeyStore");
-            else
-                System.out.println("Certificate verification failed: " + fails[1]);
+            if (fails == null) {
+                signature.put("verified", true);
+            } else {
+                signature.put("verified", false);
+                signature.put("verify_fails", fails[1].toString());
+            }
         }
 
         reader.close();
-        return true;
+
+        return toJson(response);
     }
 
     public void setFileName(String fileName) {
         this.fileName = fileName;
+    }
+
+    private String toJson(Object obj) throws Exception {
+        ObjectMapper mapper = new ObjectMapper();
+        String json = mapper.writerWithDefaultPrettyPrinter().writeValueAsString(obj);
+        return json;
     }
 }
