@@ -6,6 +6,8 @@ import com.lowagie.text.pdf.AcroFields;
 import com.lowagie.text.pdf.PdfPKCS7;
 import com.lowagie.text.pdf.PdfReader;
 import com.lowagie.text.pdf.PdfStamper;
+import org.bouncycastle.tsp.TimeStampToken;
+import sun.security.timestamp.TimestampToken;
 
 import java.io.FileOutputStream;
 import java.security.*;
@@ -22,7 +24,7 @@ public class TestSignature {
     public static void main(String[] args) {
         try {
             TestSignature ts = new TestSignature();
-            ts.setFileName("SampleSignedPDFDocument.pdf");
+            ts.setFileName("Document cu discount 100%_signed.pdf");
             String json = ts.verifyPdf();
             System.out.println(json);
             ts.setFileName("OoPdfFormExample.pdf");
@@ -59,6 +61,14 @@ public class TestSignature {
         // todo: populate the keystore
         KeyStore kall = PdfPKCS7.loadCacertsKeyStore();
 
+        try {
+            Class c = Class.forName("org.bouncycastle.jce.provider.BouncyCastleProvider");
+            java.security.Security.insertProviderAt((java.security.Provider) c.newInstance(), 2000);
+
+        } catch (Exception e) {
+            throw (new Exception("Could not register BouncyCastle crypto"));
+        }
+
         PdfReader reader = new PdfReader(fileName);
         AcroFields af = reader.getAcroFields();
 
@@ -76,7 +86,8 @@ public class TestSignature {
             // Doc info
             signature.put("revision", af.getRevision(name));
             signature.put("total_revisions", af.getTotalRevisions());
-            PdfPKCS7 pk = af.verifySignature(name);
+
+            PdfPKCS7 pk = af.verifySignature(name, "BC");
             Calendar cal = pk.getSignDate();
             Certificate pkc[] = pk.getCertificates();
 
@@ -86,12 +97,23 @@ public class TestSignature {
             signature.put("sign_date", cal.getTime());
             signature.put("sign_reason", pk.getReason());
 
-            // Information about timestamps
-            if (pk.verifyTimestampImprint()) {
-                signature.put("TSD", pk.getTimeStampDate().getTime());
-                signature.put("TSA", pk.getTimeStampToken().getTimeStampInfo().getTsa().toString());
-            }
+//            if()
 
+            // Information about timestamps
+            if(pk.getTimeStampDate() != null) {
+                signature.put("TSD1", pk.getTimeStampDate().getTime());
+            }
+            TimeStampToken timeStampToken = pk.getTimeStampToken();
+            if(timeStampToken != null) {
+                signature.put("TSA", timeStampToken.getTimeStampInfo().getTsa().toString());
+                signature.put("TSD", timeStampToken.getTimeStampInfo().getGenTime().toString());
+                signature.put("timestamp_valid", pk.verifyTimestampImprint());
+
+//                MessageDigest.getInstance("SHA-1").digest();
+
+                System.out.println(bytesToHex( timeStampToken.getTimeStampInfo().toTSTInfo().getMessageImprint().getHashedMessage() ));
+                System.out.println(timeStampToken.getTimeStampInfo().toTSTInfo().getMessageImprint());
+            }
             // Can it be verified?
             Object fails[] = PdfPKCS7.verifyCertificates(pkc, kall, null, cal);
             if (fails == null) {
@@ -115,5 +137,16 @@ public class TestSignature {
         ObjectMapper mapper = new ObjectMapper();
         String json = mapper.writerWithDefaultPrettyPrinter().writeValueAsString(obj);
         return json;
+    }
+
+    final protected static char[] hexArray = "0123456789ABCDEF".toCharArray();
+    public static String bytesToHex(byte[] bytes) {
+        char[] hexChars = new char[bytes.length * 2];
+        for ( int j = 0; j < bytes.length; j++ ) {
+            int v = bytes[j] & 0xFF;
+            hexChars[j * 2] = hexArray[v >>> 4];
+            hexChars[j * 2 + 1] = hexArray[v & 0x0F];
+        }
+        return new String(hexChars);
     }
 }
